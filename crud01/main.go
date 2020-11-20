@@ -48,7 +48,7 @@ func routes() {
 		routesConfig(rw, r, bookRouter)
 	})
 	http.HandleFunc("/books/", func(rw http.ResponseWriter, r *http.Request) {
-		routesConfig(rw, r, getBook)
+		routesConfig(rw, r, bookRouter)
 	})
 }
 
@@ -62,11 +62,25 @@ func mainRouter(w http.ResponseWriter, r *http.Request) {
 }
 
 func bookRouter(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
-		getBooks(w, r)
-	} else if r.Method == "POST" {
-		createBook(w, r)
+	splices := strings.Split(r.URL.Path, "/")
+
+	if len(splices) == 2 || len(splices) == 3 && splices[2] == "" {
+		if r.Method == "GET" {
+			getBooks(w, r)
+		} else if r.Method == "POST" {
+			createBook(w, r)
+		}
+	} else if len(splices) == 3 || len(splices) == 4 && splices[3] == "" {
+		if r.Method == "GET" {
+			getBook(w, r)
+		} else if r.Method == "DELETE" {
+			deleteBook(w, r)
+		}
+	} else {
+		fmt.Fprintf(w, "Endpoint not found")
+		w.WriteHeader(http.StatusNotFound)
 	}
+
 }
 
 func getBooks(w http.ResponseWriter, r *http.Request) {
@@ -82,16 +96,53 @@ func getBook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var id, _ = strconv.Atoi(splited[2])
+	var id, e = strconv.Atoi(splited[2])
 	var book Book
 
-	for i := 0; i < len(Books); i++ {
-		if Books[i].ID == id {
-			book = Books[i]
+	if e != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	for _, b := range Books {
+		if b.ID == id {
+			book = b
 		}
 	}
 
 	json.NewEncoder(w).Encode(book)
+}
+
+func deleteBook(w http.ResponseWriter, r *http.Request) {
+	splited := strings.Split(r.URL.Path, "/")
+
+	if len(splited) > 3 {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	var id, e = strconv.Atoi(splited[2])
+
+	if e != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	bookIndex := -1
+	for i, book := range Books {
+		if book.ID == id {
+			bookIndex = i
+		}
+	}
+
+	if bookIndex == -1 {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	Books = append(Books[0:bookIndex], Books[bookIndex+1:]...)
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func createBook(w http.ResponseWriter, r *http.Request) {
